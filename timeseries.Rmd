@@ -1,0 +1,26 @@
+---
+title: "Timeseries"
+date: "`r format(Sys.time(), '%d-%B-%Y')`"
+author: "`r paste(authors, collapse = ', ')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+---
+
+<!-- Written by Bartjan de Vries -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+\pagebreak
+
+```{r echo=FALSE, fig.keep='all', message=TRUE, results='asis'}
+  for (i in 1:length(timeseries)){
+    cat(paste("##", timeseries[[i]]$name, "\n"))
+    cat("\n")
+    print(timeseries[[i]][["plot"]])
+    cat("\n")
+    cat("\\pagebreak\n\n")
+  }
+```

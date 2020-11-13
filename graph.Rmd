@@ -1,0 +1,38 @@
+---
+title: "`r processedDay[['title']]`"
+date: "`r format(Sys.time(), '%d-%B-%Y')`"
+author: "`r paste(authors, collapse = ', ')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+---
+
+<!-- Written by Bartjan de Vries -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+\pagebreak
+
+```{r, echo=FALSE, results='asis', message=TRUE, fig.keep='all'}
+  plots <- processedDay[["plots"]]
+  summaryData <- processedDay[["summaryData"]]
+  statsAndTests <- processedDay[["statsAndTests"]]
+  day <- summaryData[[1]][[1]]
+  
+  for (i in 1:length(plots)){
+    cat(paste("##", "Day", day, statsAndTests[[i]]$statsFor, "\n"))
+    cat("### Plot\n")
+    print(plots[i])
+    cat("\n")
+    cat("### Statistics\n")
+    cat("#### General\n")
+    print(knitr::kable(statsAndTests[[i]]$general))
+    cat("#### One way ANOVA\n")
+    print(knitr::kable(summary(statsAndTests[[i]]$oneWayANOVA)[[1]]))
+    cat("#### Tukey's Test\n")
+    print(knitr::kable(statsAndTests[[i]]$TukeyTest))
+    cat("\\pagebreak\n")
+  }
+```
