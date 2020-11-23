@@ -277,8 +277,11 @@ lapply(processedDataPerDay, function(processedDay){
   render("graph.Rmd", output_file = paste0(outputDir, "/", processedDay[["title"]]))
 })
 
-stopifnot(length(excelSheets) > 1)
-
-timeseries <- processDataTimeseries(excelSheets)
-
-render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
+if(length(excelSheets) > 1){
+  timeseries <- processDataTimeseries(excelSheets)
+  
+  render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
+} else {
+  print("Not enough files for time series.")
+}
+print("Script completed.")

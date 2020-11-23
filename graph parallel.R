@@ -292,8 +292,11 @@ parLapply(cl, processedDataPerDay, function(processedDay){
 })
 stopCluster(cl)
 
-stopifnot(length(excelSheets) > 1)
+if(length(excelSheets) > 1){
+  timeseries <- processDataTimeseries(excelSheets)
 
-timeseries <- processDataTimeseries(excelSheets)
-
-render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
+  render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
+} else {
+  print("Not enough files for time series.")
+}
+print("Script completed.")
