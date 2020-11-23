@@ -144,7 +144,10 @@ cleanUpData <- function(data){
   measurementColumns <- 3:dim(data)[2]
   
   colnames(data)[measurementColumns] <- cleanColNames(colnames(data)[measurementColumns])
-  
+ 
+  if("TUBENAME" %in% colnames(data)){
+    colnames(data)[match("TUBENAME", colnames(data))] <- "TUBE NAME"
+  } 
   data$`TUBE NAME` <- as.factor(data$`TUBE NAME`)
 
   # remove the " %" and convert to numeric
