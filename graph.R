@@ -154,7 +154,7 @@ cleanUpData <- function(data){
   data[,measurementColumns] <- sapply(measurementColumns, function(x) {as.numeric(str_replace(pull(data, x), " %", ""))})
   
   # extract the group names and sample no
-  if(str_detect(data$`TUBE NAME`, "_")){
+  if(any(str_detect(data$`TUBE NAME`, "_"))){
     splitGroups <- str_split(data$`TUBE NAME`, "_")
     allGroups <- sapply(splitGroups, function(groupName){paste(groupName[1:length(groupName) -1], collapse = " ") })
     allSampleNos <- sapply(splitGroups, function(groupName){groupName[length(groupName)]})
