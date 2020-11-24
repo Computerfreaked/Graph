@@ -163,7 +163,8 @@ cleanUpData <- function(data){
     allSampleNos <- rep(NA, length(data$`TUBE NAME`))
   }
   
-  allGroups <- as.factor(str_squish(str_trim(allGroups)))
+  allGroups <- str_squish(str_trim(allGroups))
+  allGroups <- factor(allGroups, unique(allGroups), ordered = TRUE)
   allSampleNos <- as.factor(str_squish(str_trim(allSampleNos)))
   
   data <- cbind(data[1:2], Group = allGroups, sampleNo = allSampleNos, data[measurementColumns])
