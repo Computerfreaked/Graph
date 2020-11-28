@@ -172,8 +172,8 @@ cleanUpData <- function(data){
   return(data)
 }
 
+amountOfWrongFileNames <- 0
 extractDayNumbers <- function(fileName){
-  amountOfWrongFileNames <- 0
   splitFilenames <- str_split(fileName, " ")
   
   dayNumbers <- lapply(splitFilenames, function(x){
@@ -301,10 +301,12 @@ lapply(processedDataPerDay, function(processedDay){
 })
 
 if(length(excelSheets) > 1){
+  if(amountOfWrongFileNames < 0){ warning("Some day numbers are mapped to -1 because they were invalid!") }
   timeseries <- processDataTimeseries(excelSheets)
   
   render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
 } else {
   print("Not enough files for time series.")
 }
-print("Script completed.")
+if(amountOfWrongFileNames < 0){ warning("Use filenames ending on filename{space}{daynumber}") }
+warning("Script completed.")

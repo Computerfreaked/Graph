@@ -172,16 +172,15 @@ cleanUpData <- function(data){
   return(data)
 }
 
+amountOfWrongFileNames <- 0
 extractDayNumbers <- function(fileName){
-  amountOfWrongFileNames <- 0
-  
   splitFilenames <- str_split(fileName, " ")
   
   dayNumbers <- lapply(splitFilenames, function(x){
     dayNumber = str_split(x[length(x)], "\\.")[[1]][1]
     if(!grepl("^\\d+$", dayNumber)){
       amountOfWrongFileNames <<- amountOfWrongFileNames - 1
-      warning("Use filenames ending on filname{space}{daynumber}")
+
       return(amountOfWrongFileNames);
     }
     return(dayNumber)
@@ -317,11 +316,13 @@ parLapply(cl, processedDataPerDay, function(processedDay){
 })
 stopCluster(cl)
 
-if(length(excelSheets)){
+if(length(excelSheets) > 1){
+  if(amountOfWrongFileNames < 0){ warning("Some day numbers are mapped to -1 because they were invalid!") }
   timeseries <- processDataTimeseries(excelSheets)
 
   render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
 } else {
   print("Not enough files for time series.")
 }
-print("Script completed.")
+if(amountOfWrongFileNames < 0){ warning("Use filenames ending on filename{space}{daynumber}") }
+warning("Script completed.")
