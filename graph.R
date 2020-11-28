@@ -264,6 +264,11 @@ excelSheets <-lapply(filePaths, function(filePath){
 names(excelSheets) <- extractDayNumbers(basename(filePaths))
 
 excelSheets <- lapply(excelSheets, function(sheetAndInfo){
+  if(dim(sheetAndInfo$data)[1] < 1 || dim(sheetAndInfo$data)[2] <= 1){
+    warning(paste0("Sheet \"", sheetAndInfo$title, "\" does not contain valid data, completely ignored"))
+    return()
+  }
+  
   measurementColumns <- 3:dim(sheetAndInfo[["data"]])[2]
   extractedUnits <- extractUnits(sheetAndInfo[["data"]][rowToGrabUnitsFrom -1, measurementColumns])
 
@@ -279,6 +284,7 @@ excelSheets <- lapply(excelSheets, function(sheetAndInfo){
               )
   )
 })
+excelSheets <- excelSheets[!sapply(excelSheets, is.null)]
 
 processedDataPerDay <- lapply(excelSheets, processDataSingleDay)
 processedDataPerDay <- processedDataPerDay[as.character(sort(as.numeric(names(processedDataPerDay))))]

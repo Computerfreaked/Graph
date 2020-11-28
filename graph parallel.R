@@ -174,6 +174,7 @@ cleanUpData <- function(data){
 
 extractDayNumbers <- function(fileName){
   amountOfWrongFileNames <- 0
+  
   splitFilenames <- str_split(fileName, " ")
   
   dayNumbers <- lapply(splitFilenames, function(x){
@@ -264,6 +265,11 @@ excelSheets <-lapply(filePaths, function(filePath){
 names(excelSheets) <- extractDayNumbers(basename(filePaths))
 
 excelSheets <- lapply(excelSheets, function(sheetAndInfo){
+  if(dim(sheetAndInfo$data)[1] < 1 || dim(sheetAndInfo$data)[2] <= 1){
+    warning(paste0("Sheet \"", sheetAndInfo$title, "\" does not contain valid data, completely ignored"))
+    return()
+  }
+  
   measurementColumns <- 3:dim(sheetAndInfo[["data"]])[2]
   extractedUnits <- extractUnits(sheetAndInfo[["data"]][rowToGrabUnitsFrom -1, measurementColumns])
 
@@ -279,6 +285,7 @@ excelSheets <- lapply(excelSheets, function(sheetAndInfo){
               )
   )
 })
+excelSheets <- excelSheets[!sapply(excelSheets, is.null)]
 
 noOfChildren <- detectCores(logical = TRUE)
 if(noOfChildren > length(excelSheets)){
@@ -304,7 +311,7 @@ parLapply(cl, processedDataPerDay, function(processedDay){
 })
 stopCluster(cl)
 
-if(length(excelSheets) > 1){
+if(length(excelSheets)){
   timeseries <- processDataTimeseries(excelSheets)
 
   render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
