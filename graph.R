@@ -173,9 +173,20 @@ cleanUpData <- function(data){
 }
 
 extractDayNumbers <- function(fileName){
-  dayNumber <- str_split(fileName, " ")
-  dayNumber <- lapply(dayNumber, function(x){ str_split(x[length(x)], "\\.")[[1]][1]})
-  return(as.numeric(dayNumber))
+  amountOfWrongFileNames <- 0
+  splitFilenames <- str_split(fileName, " ")
+  
+  dayNumbers <- lapply(splitFilenames, function(x){
+    dayNumber = str_split(x[length(x)], "\\.")[[1]][1]
+    if(!grepl("^\\d+$", dayNumber)){
+      amountOfWrongFileNames <<- amountOfWrongFileNames - 1
+      warning("Use filenames ending on filname{space}{daynumber}")
+      return(amountOfWrongFileNames);
+    }
+    return(dayNumber)
+  })
+
+  return(as.numeric(dayNumbers))
 }
 
 removeFileExtention <- function(fileName){
