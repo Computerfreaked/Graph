@@ -222,6 +222,11 @@ processDataSingleDay <- function(theData) {
 }
 
 processDataTimeseries <- function(theData) {
+  theData <- lapply(theData, function(sheetAndInfo){
+    sheetAndInfo[["data"]][["Group"]] <- factor(sheetAndInfo[["data"]][["Group"]], ordered = FALSE)
+    return(sheetAndInfo)
+  })
+  
   dataList <- lapply(theData, function(sheetAndInfo){
     return(sheetAndInfo[["data"]])
   })
