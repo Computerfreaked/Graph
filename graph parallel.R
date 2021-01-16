@@ -37,7 +37,7 @@ perDayTheme <- theme(axis.text.x = element_text(angle = 45, hjust = 1))
 cleanColNames <- function(colNames) {
   colNames <- sapply(str_split(colNames, "\\|"), function(x) {
     name <- paste(x[1])
-    if(str_detect(x[2], "Mean")){ name <- paste0(name, "|", x[2])}
+    if(!str_detect(x[2], "Freq. of Parent")){ name <- paste0(name, "|", x[2])}
     return(name)
   })
   colNames <- (sapply(str_split(colNames, "/"), function(x){paste(x[(length(x)-noOfGatesToDisplay + 1):length(x)], collapse = "/")}))
