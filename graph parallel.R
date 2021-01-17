@@ -33,6 +33,8 @@ TukeyTestAlpha <- .05
 # make graphs look fancy
 generalTheme <- theme(plot.title = element_text(hjust = 0.5))
 perDayTheme <- theme(axis.text.x = element_text(angle = 45, hjust = 1))
+simplePalette = c("#FF0000", "#FF8000", "#FFFF00", "#80FF00", "#00FFFF", "#0000FF", "#8000FF", "#FF00FF", "#FF0080")
+extendedPalette = c("#FF0000", "#FF8000", "#FFFF00", "#80FF00", "#00FFFF", "#0000FF", "#8000FF", "#FF00FF", "#FF0080", "#478f00", "#800000", "#949400")
 
 cleanColNames <- function(colNames) {
   colNames <- sapply(str_split(colNames, "\\|"), function(x) {
@@ -53,7 +55,7 @@ extractUnits <- function(dataRow){
   dataUnits <- t(as.data.frame(dataUnits))
   row.names(dataUnits) <- "Unit"
   colnames(dataUnits) <- cleanColNames(colnames(dataRow))
-
+  
   return(dataUnits)
 }
 
@@ -69,9 +71,24 @@ stdErrorMeanOnlyUp <- function(x){
   return(x)
 }
 
+determineColorPalette <- function(amountOfNeededColours){
+  if(amountOfNeededColours <= length(simplePalette)){
+    return(simplePalette)
+  }
+  else if(amountOfNeededColours <= length(extendedPalette)){
+    return(extendedPalette)
+  }
+  else if(amountOfNeededColours <= (length(extendedPalette) + 2)){
+    return(c("#A0A0A0", extendedPalette, "#707070"))
+  }
+  else{
+    return(c("#A0A0A0", rainbow(amountOfNeededColours - 2), "#707070"))
+  }
+}
+
 createPlotDay <- function(theData, cellPop, dataUnit){
   cellPop <- as.name(cellPop)
-
+  
   if(dataUnit == "%" && !is.na(dataUnit)){
     yAxisLabel <- ylab(paste0(cellPop, " (", dataUnit, ")"))
     yAxisRange <- ylim(0, NA)
@@ -82,13 +99,15 @@ createPlotDay <- function(theData, cellPop, dataUnit){
     yAxisRange <- yAxisLabel
   }
   
+  paletteToUse = determineColorPalette(n_distinct(theData$Group))
+  
   ggplot(theData, aes(Group, !!cellPop, fill = Group)) +
     stat_summary(fun = "mean", geom="bar") +
     stat_summary(fun.data = "stdErrorMean", geom="errorbar", width = 0.3) +
     geom_jitter(width = 0.25, height = 0, shape = 1, color = "grey30") +
     yAxisRange +
     ggtitle(cellPop) + yAxisLabel +
-    generalTheme + perDayTheme
+    generalTheme + perDayTheme + scale_fill_manual(values = paletteToUse)
 }
 
 createPlotTimeseries <- function(theData, cellPop, dataUnit){
@@ -104,12 +123,14 @@ createPlotTimeseries <- function(theData, cellPop, dataUnit){
     yAxisRange <- yAxisLabel
   }
   
+  paletteToUse = determineColorPalette(n_distinct(theData$Group))
+  
   ggplot(theData, aes(Day, !!cellPop, group = Group)) +
     stat_summary(fun = "mean", geom="line", aes(color = Group), size = 0.8) +
     stat_summary(fun.data = "stdErrorMeanOnlyUp", geom="errorbar", aes(color = Group), width = 0.3) +
     yAxisRange +
     ggtitle(cellPop) + yAxisLabel +
-    generalTheme
+    generalTheme + scale_color_manual(values = paletteToUse)
 }
 
 createStatsAndTests <- function(data, summaryData, predictor, response, alpha){
@@ -300,7 +321,7 @@ if(noOfChildren > length(excelSheets)){
 cl <- makeCluster(noOfChildren)
 clusterEvalQ(cl, library(ggplot2))
 clusterEvalQ(cl, library(dplyr))
-clusterExport(cl, c("createPlotDay", "stdErrorMean", "createStatsAndTests", "generalTheme", "perDayTheme", "TukeyTestAlpha"))
+clusterExport(cl, c("createPlotDay", "stdErrorMean", "createStatsAndTests", "generalTheme", "perDayTheme", "TukeyTestAlpha", "determineColorPalette", "simplePalette", "extendedPalette"))
 
 processedDataPerDay <- parLapply(cl, excelSheets, processDataSingleDay)
 processedDataPerDay <- processedDataPerDay[as.character(sort(as.numeric(names(processedDataPerDay))))]
