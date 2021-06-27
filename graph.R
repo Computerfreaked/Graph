@@ -286,7 +286,10 @@ excelSheets <-lapply(filePaths, function(filePath){
   day <- extractDayNumbers(basename(filePath))[[1]]
   return(list(title = title, day = day, data = data))
 })
-names(excelSheets) <- extractDayNumbers(basename(filePaths))
+
+for (sheetNo in 1:length(excelSheets)) {
+  names(excelSheets)[sheetNo] <- excelSheets[[sheetNo]][["day"]]
+}
 
 excelSheets <- lapply(excelSheets, function(sheetAndInfo){
   if(dim(sheetAndInfo$data)[1] < 1 || dim(sheetAndInfo$data)[2] <= 1){

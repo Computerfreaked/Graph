@@ -288,7 +288,10 @@ excelSheets <-lapply(filePaths, function(filePath){
   day <- extractDayNumbers(basename(filePath))[[1]]
   return(list(title = title, day = day, data = data))
 })
-names(excelSheets) <- extractDayNumbers(basename(filePaths))
+
+for (sheetNo in 1:length(excelSheets)) {
+  names(excelSheets)[sheetNo] <- excelSheets[[sheetNo]][["day"]]
+}
 
 excelSheets <- lapply(excelSheets, function(sheetAndInfo){
   if(dim(sheetAndInfo$data)[1] < 1 || dim(sheetAndInfo$data)[2] <= 1){
@@ -333,7 +336,9 @@ clusterExport(cl, c("outputDir", "authors", "PANDOC_DIR"))
 clusterEvalQ(cl, Sys.setenv(RSTUDIO_PANDOC=PANDOC_DIR))
 
 parLapply(cl, processedDataPerDay, function(processedDay){
-  render("graph.Rmd", output_file = paste0(outputDir, "/", processedDay[["title"]]))
+  output_name = paste0(outputDir, "/", processedDay[["title"]])
+  render("graph.Rmd", output_file = output_name, intermediates_dir = output_name, knit_root_dir = output_name)
+  unlink(output_name, recursive=TRUE)
 })
 stopCluster(cl)
 
