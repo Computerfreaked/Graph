@@ -320,7 +320,9 @@ processedDataPerDay <- processedDataPerDay[as.character(sort(as.numeric(names(pr
 dir.create(outputDir, showWarnings = FALSE)
 
 lapply(processedDataPerDay, function(processedDay){
-  render("graph.Rmd", output_file = paste0(outputDir, "/", processedDay[["title"]]))
+  output_name = paste0(outputDir, "/", processedDay[["title"]])
+  render("graph.Rmd", output_file = output_name, intermediates_dir = output_name, knit_root_dir = output_name)
+  unlink(output_name, recursive=TRUE)
 })
 
 if(length(excelSheets) > 1){
