@@ -39,7 +39,7 @@ extendedPalette = c("#FF0000", "#FF8000", "#FFFF00", "#80FF00", "#00FFFF", "#000
 cleanColNames <- function(colNames) {
   colNames <- sapply(str_split(colNames, "\\|"), function(x) {
     name <- paste(x[1])
-    if(!str_detect(x[2], "Freq. of Parent")){ name <- paste0(name, "|", x[2])}
+    if(!str_detect(x[2], "Freq. of Parent") && !is.na(x[2])){ name <- paste0(name, "|", x[2])}
     return(name)
   })
   colNames <- (sapply(str_split(colNames, "/"), function(x){paste(x[(length(x)-noOfGatesToDisplay + 1):length(x)], collapse = "/")}))
@@ -50,8 +50,14 @@ cleanColNames <- function(colNames) {
 
 extractUnits <- function(dataRow){
   dataUnits <- str_split(dataRow, " ")
-  dataUnits <- sapply(dataUnits, function(x){str_replace(x[length(x)], "[0-9]+", "")})
-  dataUnits[dataUnits == ""] <- NA
+  dataUnits <- sapply(dataUnits, function(x){
+    if(length(x) > 1){
+      return(x[length(x)])
+    }
+    else{
+      return(NA)
+    }
+  })
   dataUnits <- t(as.data.frame(dataUnits))
   row.names(dataUnits) <- "Unit"
   colnames(dataUnits) <- cleanColNames(colnames(dataRow))
@@ -160,19 +166,32 @@ createStatsAndTests <- function(data, summaryData, predictor, response, alpha){
 }
 
 cleanUpData <- function(data){
-  data <- data[1:(dim(data)[1] -2), ]
+  if(data[(dim(data)[1]), 1] == 'SD'){
+    # this is flowjo data
+    data <- data[1:(dim(data)[1] -2), ]
+    data <- data[, 2:dim(data)[2]]
+  }
+  else if(colnames(data)[1] == 'file'){
+    # this is omiq data
+    colnames(data)[1] = 'TUBE NAME'
+    data <- cbind(data[1], data[,str_detect(colnames(data), '%.*of.*')])
+  }
+  else{
+    warning('Could not properly detect input format (FlowJo / Omiq), result may very well be wrong!')
+  }
   
-  measurementColumns <- 3:dim(data)[2]
+  measurementColumns <- 2:dim(data)[2]
+  extractedUnits <- extractUnits(data[rowToGrabUnitsFrom -1, measurementColumns])
   
   colnames(data)[measurementColumns] <- cleanColNames(colnames(data)[measurementColumns])
   
   if("TUBENAME" %in% colnames(data)){
     colnames(data)[match("TUBENAME", colnames(data))] <- "TUBE NAME"
-  }
+  } 
   data$`TUBE NAME` <- as.factor(data$`TUBE NAME`)
   
-  # remove the " %" and convert to numeric
-  data[,measurementColumns] <- sapply(measurementColumns, function(x) {as.numeric(str_replace(pull(data, x), " %", ""))})
+  # remove the unit (' %') and convert to numeric
+  data[,measurementColumns] <- sapply(measurementColumns, function(x) {as.numeric(str_replace(pull(data, x), " .*", ""))})
   
   # extract the group names and sample no
   if(any(str_detect(data$`TUBE NAME`, "_"))){
@@ -188,9 +207,9 @@ cleanUpData <- function(data){
   allGroups <- factor(allGroups, unique(allGroups), ordered = TRUE)
   allSampleNos <- as.factor(str_squish(str_trim(allSampleNos)))
   
-  data <- cbind(data[1:2], Group = allGroups, sampleNo = allSampleNos, data[measurementColumns])
+  data <- cbind(data[1], Group = allGroups, sampleNo = allSampleNos, data[measurementColumns])
   
-  return(data)
+  return(list(data = data, units = extractedUnits))
 }
 
 amountOfWrongFileNames <- 0
@@ -220,16 +239,16 @@ processDataSingleDay <- function(theData) {
   dataUnits <- theData[["extractedUnits"]]
   title <- theData[["title"]]
   theData <- theData[["data"]]
-  measurementColumns <- 6:(dim(theData)[[2]])
-
+  measurementColumns <- 5:(dim(theData)[[2]])
+  
   plots <- lapply(measurementColumns, function(x){
-    createPlotDay( theData[, c(colnames(theData)[x], "Group", "sampleNo")],
-                cellPop = colnames(theData)[x],
-                dataUnit = dataUnits[,colnames(theData)[x]])
+    createPlotDay( theData[, c(colnames(theData)[x], "Group")],
+                   cellPop = colnames(theData)[x],
+                   dataUnit = dataUnits[,colnames(theData)[x]])
   })
   
   summaryData <- theData %>% group_by(Day, Group) %>% summarise(noOfSamples = n(),
-                                                        across(all_of(colnames(theData)[measurementColumns]), list(SD = sd, SEM = stdErrorMean)))
+                                                                across(all_of(colnames(theData)[measurementColumns]), list(SD = sd, SEM = stdErrorMean)))
   
   statsAndTests <- sapply(colnames(theData)[measurementColumns], createStatsAndTests,
                           data = theData,
@@ -245,7 +264,6 @@ processDataSingleDay <- function(theData) {
 processDataTimeseries <- function(theData) {
   theData <- lapply(theData, function(sheetAndInfo){
     sheetAndInfo[["data"]][["Group"]] <- factor(sheetAndInfo[["data"]][["Group"]], ordered = FALSE)
-    str(sheetAndInfo[["data"]][["Group"]])
     return(sheetAndInfo)
   })
   
@@ -262,16 +280,13 @@ processDataTimeseries <- function(theData) {
   
   levels(allData$Day) <- sort(as.numeric(levels(allData$Day)))
   
-  #allDataGrouped <- allData %>% group_by(Group, Day) %>% summarise(across(all_of(colnames(allData)[6:length(allData)]), list(mean = mean)))
-  #allData <- allData[order(allData$Group, allData$Day),]
-  
-  measurementColumns <- 6:(dim(allData)[[2]])
+  measurementColumns <- 5:(dim(allData)[[2]])
   results <- lapply(measurementColumns, function(x){
-    theData <- na.omit(allData[, c(colnames(allData)[x], "Group", "Day", "sampleNo")])
+    theData <- na.omit(allData[, c(colnames(allData)[x], "Group", "Day")])
     
     plot <- createPlotTimeseries( theData,
-                          cellPop = colnames(allData)[x],
-                          dataUnit <- allUnits[,colnames(allData)[x]])
+                                  cellPop = colnames(allData)[x],
+                                  dataUnit <- allUnits[,colnames(allData)[x]])
     
     list(name = c(colnames(allData)[x]), plot = plot)
   })
@@ -299,19 +314,18 @@ excelSheets <- lapply(excelSheets, function(sheetAndInfo){
     return()
   }
   
-  measurementColumns <- 3:dim(sheetAndInfo[["data"]])[2]
-  extractedUnits <- extractUnits(sheetAndInfo[["data"]][rowToGrabUnitsFrom -1, measurementColumns])
-
-  theData <- cleanUpData(sheetAndInfo[["data"]])
-  theData <- cbind(theData[1:4],
+  dataAndUnits <- cleanUpData(sheetAndInfo[["data"]])
+  extractedUnits <- dataAndUnits[['units']]
+  theData <- dataAndUnits[['data']]
+  theData <- cbind(theData[1:3],
                    Day = as.numeric(sheetAndInfo[["day"]]),
-                   theData[5:dim(theData)[2]])
+                   theData[4:dim(theData)[2]])
   
   return(list(title = sheetAndInfo[["title"]],
               day = sheetAndInfo[["day"]],
               data = theData,
               extractedUnits = extractedUnits
-              )
+  )
   )
 })
 excelSheets <- excelSheets[!sapply(excelSheets, is.null)]
@@ -345,8 +359,9 @@ stopCluster(cl)
 if(length(excelSheets) > 1){
   if(amountOfWrongFileNames < 0){ warning("Some day numbers are mapped to -1 because they were invalid!") }
   timeseries <- processDataTimeseries(excelSheets)
-
-  render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
+  
+  output_name = paste0(outputDir, "/Timeseries")
+  render("timeseries.Rmd", output_file = output_name, intermediates_dir = output_name, knit_root_dir = output_name)
 } else {
   print("Not enough files for time series.")
 }

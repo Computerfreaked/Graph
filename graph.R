@@ -38,7 +38,7 @@ extendedPalette = c("#FF0000", "#FF8000", "#FFFF00", "#80FF00", "#00FFFF", "#000
 cleanColNames <- function(colNames) {
   colNames <- sapply(str_split(colNames, "\\|"), function(x) {
     name <- paste(x[1])
-    if(!str_detect(x[2], "Freq. of Parent")){ name <- paste0(name, "|", x[2])}
+    if(!str_detect(x[2], "Freq. of Parent") && !is.na(x[2])){ name <- paste0(name, "|", x[2])}
     return(name)
   })
   colNames <- (sapply(str_split(colNames, "/"), function(x){paste(x[(length(x)-noOfGatesToDisplay + 1):length(x)], collapse = "/")}))
@@ -49,8 +49,14 @@ cleanColNames <- function(colNames) {
 
 extractUnits <- function(dataRow){
   dataUnits <- str_split(dataRow, " ")
-  dataUnits <- sapply(dataUnits, function(x){str_replace(x[length(x)], "[0-9]+", "")})
-  dataUnits[dataUnits == ""] <- NA
+  dataUnits <- sapply(dataUnits, function(x){
+    if(length(x) > 1){
+      return(x[length(x)])
+    }
+    else{
+      return(NA)
+    }
+  })
   dataUnits <- t(as.data.frame(dataUnits))
   row.names(dataUnits) <- "Unit"
   colnames(dataUnits) <- cleanColNames(colnames(dataRow))
@@ -107,7 +113,7 @@ createPlotDay <- function(theData, cellPop, dataUnit){
     yAxisRange +
     ggtitle(cellPop) + yAxisLabel +
     generalTheme + perDayTheme + scale_fill_manual(values = paletteToUse)
-  }
+}
 
 createPlotTimeseries <- function(theData, cellPop, dataUnit){
   cellPop <- as.name(cellPop)
@@ -159,9 +165,22 @@ createStatsAndTests <- function(data, summaryData, predictor, response, alpha){
 }
 
 cleanUpData <- function(data){
-  data <- data[1:(dim(data)[1] -2), ]
+  if(data[(dim(data)[1]), 1] == 'SD'){
+    # this is flowjo data
+    data <- data[1:(dim(data)[1] -2), ]
+    data <- data[, 2:dim(data)[2]]
+  }
+  else if(colnames(data)[1] == 'file'){
+    # this is omiq data
+    colnames(data)[1] = 'TUBE NAME'
+    data <- cbind(data[1], data[,str_detect(colnames(data), '%.*of.*')])
+  }
+  else{
+    warning('Could not properly detect input format (FlowJo / Omiq), result may very well be wrong!')
+  }
   
-  measurementColumns <- 3:dim(data)[2]
+  measurementColumns <- 2:dim(data)[2]
+  extractedUnits <- extractUnits(data[rowToGrabUnitsFrom -1, measurementColumns])
   
   colnames(data)[measurementColumns] <- cleanColNames(colnames(data)[measurementColumns])
  
@@ -170,8 +189,8 @@ cleanUpData <- function(data){
   } 
   data$`TUBE NAME` <- as.factor(data$`TUBE NAME`)
 
-  # remove the " %" and convert to numeric
-  data[,measurementColumns] <- sapply(measurementColumns, function(x) {as.numeric(str_replace(pull(data, x), " %", ""))})
+  # remove the unit (' %') and convert to numeric
+  data[,measurementColumns] <- sapply(measurementColumns, function(x) {as.numeric(str_replace(pull(data, x), " .*", ""))})
   
   # extract the group names and sample no
   if(any(str_detect(data$`TUBE NAME`, "_"))){
@@ -187,9 +206,9 @@ cleanUpData <- function(data){
   allGroups <- factor(allGroups, unique(allGroups), ordered = TRUE)
   allSampleNos <- as.factor(str_squish(str_trim(allSampleNos)))
   
-  data <- cbind(data[1:2], Group = allGroups, sampleNo = allSampleNos, data[measurementColumns])
+  data <- cbind(data[1], Group = allGroups, sampleNo = allSampleNos, data[measurementColumns])
   
-  return(data)
+  return(list(data = data, units = extractedUnits))
 }
 
 amountOfWrongFileNames <- 0
@@ -200,7 +219,7 @@ extractDayNumbers <- function(fileName){
     dayNumber = str_split(x[length(x)], "\\.")[[1]][1]
     if(!grepl("^\\d+$", dayNumber)){
       amountOfWrongFileNames <<- amountOfWrongFileNames - 1
-      warning("Use filenames ending on filname{space}{daynumber}")
+
       return(amountOfWrongFileNames);
     }
     return(dayNumber)
@@ -219,10 +238,10 @@ processDataSingleDay <- function(theData) {
   dataUnits <- theData[["extractedUnits"]]
   title <- theData[["title"]]
   theData <- theData[["data"]]
-  measurementColumns <- 6:(dim(theData)[[2]])
+  measurementColumns <- 5:(dim(theData)[[2]])
 
   plots <- lapply(measurementColumns, function(x){
-    createPlotDay( theData[, c(colnames(theData)[x], "Group", "sampleNo")],
+    createPlotDay( theData[, c(colnames(theData)[x], "Group")],
                 cellPop = colnames(theData)[x],
                 dataUnit = dataUnits[,colnames(theData)[x]])
   })
@@ -260,12 +279,9 @@ processDataTimeseries <- function(theData) {
   
   levels(allData$Day) <- sort(as.numeric(levels(allData$Day)))
   
-  #allDataGrouped <- allData %>% group_by(Group, Day) %>% summarise(across(all_of(colnames(allData)[6:length(allData)]), list(mean = mean)))
-  #allData <- allData[order(allData$Group, allData$Day),]
-  
-  measurementColumns <- 6:(dim(allData)[[2]])
+  measurementColumns <- 5:(dim(allData)[[2]])
   results <- lapply(measurementColumns, function(x){
-    theData <- na.omit(allData[, c(colnames(allData)[x], "Group", "Day", "sampleNo")])
+    theData <- na.omit(allData[, c(colnames(allData)[x], "Group", "Day")])
     
     plot <- createPlotTimeseries( theData,
                           cellPop = colnames(allData)[x],
@@ -297,13 +313,12 @@ excelSheets <- lapply(excelSheets, function(sheetAndInfo){
     return()
   }
   
-  measurementColumns <- 3:dim(sheetAndInfo[["data"]])[2]
-  extractedUnits <- extractUnits(sheetAndInfo[["data"]][rowToGrabUnitsFrom -1, measurementColumns])
-
-  theData <- cleanUpData(sheetAndInfo[["data"]])
-  theData <- cbind(theData[1:4],
+  dataAndUnits <- cleanUpData(sheetAndInfo[["data"]])
+  extractedUnits <- dataAndUnits[['units']]
+  theData <- dataAndUnits[['data']]
+  theData <- cbind(theData[1:3],
                    Day = as.numeric(sheetAndInfo[["day"]]),
-                   theData[5:dim(theData)[2]])
+                   theData[4:dim(theData)[2]])
   
   return(list(title = sheetAndInfo[["title"]],
               day = sheetAndInfo[["day"]],
@@ -329,7 +344,8 @@ if(length(excelSheets) > 1){
   if(amountOfWrongFileNames < 0){ warning("Some day numbers are mapped to -1 because they were invalid!") }
   timeseries <- processDataTimeseries(excelSheets)
   
-  render("timeseries.Rmd", output_file = paste0(outputDir, "/Timeseries"))
+  output_name = paste0(outputDir, "/Timeseries")
+  render("timeseries.Rmd", output_file = output_name, intermediates_dir = output_name, knit_root_dir = output_name)
 } else {
   print("Not enough files for time series.")
 }
